@@ -1,103 +1,195 @@
-import Image from "next/image";
+"use client";
+
+import type React from "react";
+import { useState, useRef, useEffect } from "react";
+import { ExcelToolbar } from "@/components/excel-toolbar";
+import { StatusBar } from "@/components/status-bar";
+import { SpreadsheetGrid } from "@/components/spreadsheet-grid";
+import { Input } from "@/components/ui/input";
+import { Upload, File, X } from "lucide-react";
+import { Excel97Header } from "@/components/excel97-header";
+import { useSheets } from "../../contexts/sheet-context";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const { activeSheet, updateSheetWizardState, navigateToWizardStep } =
+    useSheets();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const [story, setStory] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load wizard state from active sheet
+  useEffect(() => {
+    if (activeSheet && !isInitialized) {
+      const { story: sheetStory, file: sheetFiles } = activeSheet.wizardState;
+      if (sheetStory) setStory(sheetStory);
+      if (sheetFiles) setFiles(sheetFiles);
+      setIsInitialized(true);
+    }
+  }, [activeSheet, isInitialized]);
+
+  // Reset state when active sheet changes
+  useEffect(() => {
+    setIsInitialized(false);
+    setStory("");
+    setFiles([]);
+  }, [activeSheet?.id]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      // Enforce maximum of 5 files
+      const combinedFiles = [...files, ...newFiles].slice(0, 5);
+      setFiles(combinedFiles);
+      if (activeSheet) {
+        updateSheetWizardState(activeSheet.id, { file: combinedFiles });
+      }
+    }
+  };
+
+  const handleStoryChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newStory = e.target.value;
+    setStory(newStory);
+    if (activeSheet) {
+      updateSheetWizardState(activeSheet.id, { story: newStory });
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveFile = (fileToRemove: File) => {
+    const updatedFiles = files.filter((file) => file !== fileToRemove);
+    setFiles(updatedFiles);
+    if (activeSheet) {
+      updateSheetWizardState(activeSheet.id, { file: updatedFiles });
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (activeSheet) {
+      // Update the wizard step and navigate to questions
+      updateSheetWizardState(activeSheet.id, {
+        wizardStep: "questions",
+        currentStep: "initial",
+        storyDetails: {},
+        file: files,
+      });
+      navigateToWizardStep("questions");
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen">
+      <Excel97Header />
+      <ExcelToolbar />
+
+      <SpreadsheetGrid>
+        <div className="flex flex-col items-center justify-center">
+          <div className="win98-window max-w-xl mx-auto">
+            <div className="win98-title-bar bg-[#000080] text-white">
+              Let AI build you the perfect chart
+            </div>
+            <div className="p-4 bg-[#c0c0c0]">
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <div className="space-y-2">
+                  <label htmlFor="story" className="block font-bold text-black">
+                    What story do you want to tell and who is your audience?
+                  </label>
+                  <textarea
+                    id="story"
+                    placeholder="E.g., I want to show the quarterly sales growth to my executive team..."
+                    className="win98-input w-full bg-white fixed-height-textarea"
+                    value={story}
+                    onChange={handleStoryChange}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="file" className="block font-bold text-black">
+                    Upload data
+                  </label>
+                  <Input
+                    ref={fileInputRef}
+                    id="file"
+                    type="file"
+                    accept=".csv,.xlsx,.xls,.jpg,.jpeg,.png"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    multiple
+                  />
+                  {files.length === 0 ? (
+                    <div
+                      className="win98-input flex items-center justify-center h-24 border-dashed cursor-pointer bg-white"
+                      onClick={handleUploadClick}
+                    >
+                      <div className="text-center">
+                        <Upload className="mx-auto h-6 w-6 text-[#000080]" />
+                        <p className="mt-2 text-sm text-gray-600">
+                          Drag and drop up to 5 files (CSV, Excel, JPG, or PNG),
+                          or click to browse
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="win98-input p-3 flex flex-col space-y-2 bg-white">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">
+                          {files.length} of 5 files selected
+                        </span>
+                        {files.length < 5 && (
+                          <button
+                            type="button"
+                            onClick={handleUploadClick}
+                            className="win98-button text-xs py-1 px-2"
+                          >
+                            Add More
+                          </button>
+                        )}
+                      </div>
+                      {files.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex items-center">
+                            <File className="h-5 w-5 text-[#000080] mr-2" />
+                            <div>
+                              <p className="font-medium text-sm">{file.name}</p>
+                              <p className="text-xs text-gray-600">
+                                {(file.size / 1024).toFixed(2)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile(file)}
+                            className="p-1 hover:bg-[#d4d0c8] rounded-full"
+                          >
+                            <X className="h-4 w-4 text-gray-600" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end">
+                  <button type="submit" className="win98-button">
+                    Generate Chart
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </SpreadsheetGrid>
+
+      <StatusBar />
     </div>
   );
 }

@@ -1,0 +1,49 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  CI:
+    timeout-minutes: 15
+    permissions: write-all
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York # Set the timezone to America/New York
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Secrets Passed
+        run: printenv | grep NEON_ || echo "Secrets not available"
+
+      - name: List Directory
+        run: ls -R
+
+      - name: Print Environment Variables (without secrets)
+        run: printenv | grep NEON_ || echo "Secrets not available"
+
+      - name: NPM Install
+        run: npm ci
+
+      - name: Type Check
+        run: npm run typecheck
+
+      - name: Prettier
+        run: npx prettier --check .
+        continue-on-error: true
+
+      - name: ESLint
+        working-directory: src/
+        run: npx eslint . --output-file ../../eslint_report.json --format json
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eslint_report.json
+          path: eslint_report.json
+          retention-days: 5
